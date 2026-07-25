@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block headright %}canlı akış · sayfa kendini yeniler{% endblock %}
+{% block body %}
+
+<div class="cards">
+  <div class="card"><div class="k">taranan token</div><div class="v">{{ stats.total }}</div></div>
+  <div class="card"><div class="k">honeypot</div><div class="v" style="color:var(--red)">{{ stats.honeypots }}</div></div>
+  <div class="card"><div class="k">bilinen dolandırıcı</div><div class="v">{{ stats.crews }}</div></div>
+</div>
+
+<div class="tabs">
+  <a class="tab {% if not only %}on{% endif %}" href="/">hepsi</a>
+  <a class="tab {% if only == 'honeypot' %}on{% endif %}" href="/?only=honeypot">honeypot</a>
+  <a class="tab {% if only == 'riskli' %}on{% endif %}" href="/?only=riskli">riskli</a>
+  <a class="tab {% if only == 'temiz' %}on{% endif %}" href="/?only=temiz">temiz</a>
+</div>
+
+{% if items %}
+<table>
+  <thead>
+    <tr>
+      <th style="width:32%">token / kontrat</th>
+      <th style="width:12%">durum</th>
+      <th style="width:14%">al / sat</th>
+      <th style="width:12%">sahip %</th>
+      <th style="width:30%">çıkaran</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for t in items %}
+    <tr>
+      <td>
+        <a href="/token/{{ t.address }}"><b>{{ t.symbol or "?" }}</b></a>
+        {% if t.name %}<span class="muted">{{ t.name[:24] }}</span>{% endif %}
+        <div class="mono muted">
+          {{ t.address }}
+          <button class="copy" onclick="kopyala('{{ t.address }}', this)">kopyala</button>
+        </div>
+      </td>
+      <td><span class="pill {{ t.verdict }}">{{ t.verdict }}</span></td>
+      <td class="mono">
+        {{ "%.0f"|format(t.buy_tax) if t.buy_tax is not none else "?" }}% /
+        <span {% if t.sell_tax is not none and t.sell_tax >= 50 %}style="color:var(--red)"{% endif %}>
+          {{ "%.0f"|format(t.sell_tax) if t.sell_tax is not none else "?" }}%
+        </span>
+      </td>
+      <td class="mono">{{ "%.0f"|format(t.lp_locked_pct) if t.lp_locked_pct is not none else "?" }}%</td>
+      <td>
+        {% if t.creator %}
+          <a class="mono" href="/scammer/{{ t.creator }}">{{ t.creator|short }}</a>
+          {% if t.crew_honeypots and t.crew_honeypots > 1 %}
+            <div class="warn">bu ekibin {{ t.crew_honeypots }}. tuzağı</div>
+          {% endif %}
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">
+  Henüz kayıt yok — tarayıcı yeni havuz bekliyor.<br>
+  <span class="muted">BSC'de sürekli token açılıyor, birkaç dakika içinde dolmaya başlar.</span>
+</div>
+{% endif %}
+
+<div class="note">
+  Bu bir <b>erken uyarı</b> aracıdır, kesin hüküm değil. Bugün "temiz" görünen bir token
+  yarın satış vergisini yükseltebilir — o yüzden token'lar {{ 12 }} saatte bir yeniden taranır.
+  Yatırım tavsiyesi değildir.
+</div>
+
+<script>setTimeout(function(){ location.reload(); }, 60000);</script>
+{% endblock %}

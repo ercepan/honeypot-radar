@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Çıkaran {{ address[:10] }} · Honeypot Radar{% endblock %}
+{% block body %}
+
+<a class="back" href="/">← akışa dön</a>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="k muted">kontrat açan cüzdan</div>
+  <div class="mono" style="font-size:15px;margin-top:4px">
+    {{ address }}
+    <button class="copy" onclick="kopyala('{{ address }}', this)">kopyala</button>
+  </div>
+  {% if crew and crew.funder %}
+    <div class="muted" style="margin-top:8px">
+      fon kaynağı: <a class="mono" href="/scammer/{{ crew.funder }}">{{ crew.funder|short }}</a>
+    </div>
+  {% endif %}
+</div>
+
+{% if crew %}
+<div class="cards">
+  <div class="card"><div class="k">açtığı token</div><div class="v">{{ crew.token_count }}</div></div>
+  <div class="card"><div class="k">honeypot</div>
+    <div class="v" style="color:var(--red)">{{ crew.honeypot_count }}</div></div>
+  <div class="card"><div class="k">ilk görülme</div>
+    <div class="v" style="font-size:14px">{{ crew.first_seen|string|truncate(16, true, "") }}</div></div>
+</div>
+
+{% if crew.honeypot_count and crew.honeypot_count >= 3 %}
+<div class="note" style="border-left-color:var(--red);color:var(--red)">
+  Bu cüzdan {{ crew.honeypot_count }} ayrı honeypot açmış. Aynı kişiden gelen
+  yeni token'lara <b>dikkat et</b> — kalıp tekrar ediyor.
+</div>
+{% endif %}
+{% endif %}
+
+<h2>açtığı token'lar</h2>
+{% if tokens %}
+<table>
+  <thead>
+    <tr>
+      <th style="width:40%">token / kontrat</th>
+      <th style="width:15%">durum</th>
+      <th style="width:20%">al / sat</th>
+      <th style="width:25%">bulunma</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for t in tokens %}
+    <tr>
+      <td>
+        <a href="/token/{{ t.address }}"><b>{{ t.symbol or "?" }}</b></a>
+        <div class="mono muted">{{ t.address }}</div>
+      </td>
+      <td><span class="pill {{ t.verdict }}">{{ t.verdict }}</span></td>
+      <td class="mono">
+        {{ "%.0f"|format(t.buy_tax) if t.buy_tax is not none else "?" }}% /
+        {{ "%.0f"|format(t.sell_tax) if t.sell_tax is not none else "?" }}%
+      </td>
+      <td class="mono muted">{{ t.found_at|string|truncate(16, true, "") }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">Bu cüzdana bağlı kayıtlı token yok.</div>
+{% endif %}
+
+{% if siblings %}
+<h2>aynı kaynaktan fonlanan diğer cüzdanlar</h2>
+<div class="muted" style="margin-bottom:8px">
+  Aynı cüzdandan para almışlar — büyük ihtimalle aynı ekip.
+</div>
+<table>
+  <thead>
+    <tr><th style="width:55%">cüzdan</th><th style="width:20%">token</th><th style="width:25%">honeypot</th></tr>
+  </thead>
+  <tbody>
+  {% for s in siblings %}
+    <tr>
+      <td><a class="mono" href="/scammer/{{ s.address }}">{{ s.address }}</a></td>
+      <td class="mono">{{ s.token_count }}</td>
+      <td class="mono" style="color:var(--red)">{{ s.honeypot_count }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% endblock %}

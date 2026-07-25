@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{{ (t.symbol if t else address) }} · Honeypot Radar{% endblock %}
+{% block body %}
+
+<a class="back" href="/">← akışa dön</a>
+
+{% if not t %}
+  <div class="empty">Bu adres için veri alınamadı.<br>
+    <span class="mono muted">{{ address }}</span>
+  </div>
+{% else %}
+
+<div class="card" style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
+    <div>
+      <div style="font-size:18px;font-weight:600">
+        {{ t.symbol or "?" }}
+        <span class="muted" style="font-weight:400">{{ t.name or "" }}</span>
+      </div>
+      <div class="mono muted">
+        {{ t.address }}
+        <button class="copy" onclick="kopyala('{{ t.address }}', this)">kopyala</button>
+      </div>
+    </div>
+    <span class="pill {{ t.verdict }}" style="font-size:14px;padding:6px 14px">{{ t.verdict }}</span>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="k">alış vergisi</div>
+    <div class="v">{{ "%.1f"|format(t.buy_tax) if t.buy_tax is not none else "?" }}%</div></div>
+  <div class="card"><div class="k">satış vergisi</div>
+    <div class="v" {% if t.sell_tax is not none and t.sell_tax >= 50 %}style="color:var(--red)"{% endif %}>
+      {{ "%.1f"|format(t.sell_tax) if t.sell_tax is not none else "?" }}%</div></div>
+  <div class="card"><div class="k">sahip sayısı</div>
+    <div class="v">{{ t.holder_count or "?" }}</div></div>
+  <div class="card"><div class="k">kilitli likidite</div>
+    <div class="v">{{ "%.0f"|format(t.lp_locked_pct) if t.lp_locked_pct is not none else "?" }}%</div></div>
+</div>
+
+{% if reasons %}
+<h2>neden işaretlendi</h2>
+<table>
+  <tbody>
+  {% for r in reasons %}
+    <tr><td>{{ r }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>kim ne almış</h2>
+{% if summary.no_sells %}
+  <div class="note" style="border-left-color:var(--red);color:var(--red)">
+    {{ summary.buys }} alım, <b>0 başarılı satış</b> — klasik honeypot deseni.
+  </div>
+{% endif %}
+
+{% if trades %}
+<table>
+  <thead>
+    <tr>
+      <th style="width:18%">zaman</th>
+      <th style="width:12%">tür</th>
+      <th style="width:20%">tutar</th>
+      <th style="width:50%">cüzdan</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for tr in trades %}
+    <tr>
+      <td class="mono muted">{{ tr.time[11:19] if tr.time else "—" }}</td>
+      <td style="color:{{ 'var(--green)' if tr.is_buy else 'var(--red)' }}">{{ tr.kind }}</td>
+      <td class="mono">${{ "%.0f"|format(tr.usd) }}</td>
+      <td class="mono muted">{{ tr.wallet|short }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="muted" style="margin-top:8px">
+  son {{ trades|length }} işlem · {{ summary.buys }} alım / {{ summary.sells }} satım
+</div>
+{% else %}
+<div class="empty">
+  İşlem verisi alınamadı.<br>
+  <span class="muted">Havuz çok yeni olabilir ya da veri sağlayıcı hız limiti uyguluyor — biraz sonra tekrar dene.</span>
+</div>
+{% endif %}
+
+{% if t.creator %}
+<h2>çıkaran</h2>
+<table>
+  <tbody>
+    <tr>
+      <td style="width:30%" class="muted">kontratı açan</td>
+      <td><a class="mono" href="/scammer/{{ t.creator }}">{{ t.creator }}</a></td>
+    </tr>
+    {% if crew %}
+    <tr>
+      <td class="muted">geçmişi</td>
+      <td>
+        {{ crew.token_count }} token açmış,
+        <b style="color:var(--red)">{{ crew.honeypot_count }}</b> tanesi honeypot
+      </td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+{% endif %}
+
+{% endif %}
+{% endblock %}
