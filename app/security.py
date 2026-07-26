@@ -298,8 +298,64 @@ def _decide(rep: TokenReport) -> str:
     return CLEAN
 
 
-async def analyze(session: aiohttp.ClientSession, address: str) -> TokenReport:
-    """Token'ı iki kaynakla inceleyip tek bir karara bağlar."""
+async def _read_onchain(
+    session: aiohttp.ClientSession, rep: TokenReport, holders: list[str]
+) -> None:
+    """Zincir üstü kendi testlerimiz — üçüncü parti API'lere bağımlı değil.
+
+    Bunlar özellikle 'seçici kara liste' tuzaklarını yakalamak için var: temiz
+    bir test cüzdanıyla yapılan simülasyon aldanır, gerçek sahiplerle yapılan
+    test aldanmaz.
+    """
+    from . import trap
+
+    pair = (rep.pair_address or trap.v2_pair(rep.address, config.WBNB)).lower()
+
+    try:
+        # 1) Sahibin sonsuz bakiyesi — havuzu dilediğince boşaltabilir demek
+        if rep.owner or rep.creator:
+            inf = await trap.owner_infinite_balance(
+                session, rep.address, rep.owner or rep.creator or ""
+            )
+            if inf:
+                rep.reasons.append("Sahibin bakiyesi sınırsız (havuzu boşaltabilir)")
+                rep.score += 3
+                rep.has_data = True
+
+        # 2) Önceden yasaklanmış havuzlar (gecikmeli honeypot ailesi)
+        if holders:
+            pre = await trap.detect_preblocked_pools(session, rep.address, holders[0])
+            if pre:
+                rep.reasons.append(
+                    f"Var olmayan {pre['engellenen_sayisi']} havuz adresi önceden "
+                    "yasaklanmış — kaçış yolu kapatılmış"
+                )
+                rep.score += HARD
+                rep.has_data = True
+
+        # 3) Gerçek sahipler satabiliyor mu
+        if holders:
+            test = await trap.holder_sell_test(session, rep.address, pair, holders)
+            if test:
+                rep.has_data = True
+                if test["oran"] >= 0.4:
+                    rep.reasons.append(
+                        f"Sahiplerin {test['engellenen']}/{test['denenen']}'i satamıyor"
+                    )
+                    rep.score += HARD
+                elif test["engellenen"] > 0:
+                    rep.reasons.append(
+                        f"Bazı cüzdanlar donduruImuş ({test['engellenen']}/{test['denenen']})"
+                    )
+                    rep.score += 2
+    except Exception:  # noqa: BLE001 — zincir testleri analizi durdurmaz
+        log.debug("zincir üstü test başarısız: %s", rep.address, exc_info=True)
+
+
+async def analyze(
+    session: aiohttp.ClientSession, address: str, deep: bool = True
+) -> TokenReport:
+    """Token'ı iki dış kaynak + kendi zincir testlerimizle tek karara bağlar."""
     address = address.lower()
     rep = TokenReport(address=address)
 
@@ -308,10 +364,18 @@ async def analyze(session: aiohttp.ClientSession, address: str) -> TokenReport:
         honeypot_is(session, address),
         return_exceptions=True,
     )
+    holders: list[str] = []
     if isinstance(g, dict):
         _read_goplus(rep, g)
+        for x in (g.get("holders") or [])[:10]:
+            a = (x.get("address") or "").lower()
+            if a and str(x.get("is_contract")) != "1":
+                holders.append(a)
     if isinstance(h, dict):
         _read_honeypot_is(rep, h)
+
+    if deep:
+        await _read_onchain(session, rep, holders)
 
     rep.verdict = _decide(rep)
     return rep

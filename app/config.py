@@ -18,6 +18,8 @@ except ModuleNotFoundError:
 
 CHAIN_ID = 56  # BSC mainnet
 
+WBNB = "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"
+
 # PancakeSwap fabrikaları (zincir üzerinde eth_call ile doğrulandı)
 V2_FACTORY = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73"
 V3_FACTORY = "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
