@@ -207,15 +207,21 @@ async def rescanner(session: aiohttp.ClientSession) -> None:
         await asyncio.sleep(config.UNKNOWN_RETRY_MINUTES * 60)
         try:
             fresh_cut = _now() - timedelta(minutes=config.UNKNOWN_RETRY_MINUTES)
-            unknowns = await db.rows(
+            young_cut = _now() - timedelta(hours=config.YOUNG_WATCH_HOURS)
+            # Taze token'lar: ilk taramada GoPlus verisi HENÜZ gelmemiş olur
+            # (token dakikalar sonra indeksleniyor). Bu yüzden yalnızca
+            # "bilinmiyor" olanları değil, son saatlerde bulunan HER token'ı
+            # birkaç kez yeniden tarıyoruz — yoksa geç gelen honeypot bayrağı
+            # 12 saat boyunca kaçıyordu.
+            fresh = await db.rows(
                 "SELECT address, pair_address, dex_version, block_number FROM tokens "
-                "WHERE verdict = ? AND scan_count < ? AND scanned_at < ? "
+                "WHERE verdict != ? AND scan_count < ? AND scanned_at < ? AND found_at > ? "
                 "ORDER BY found_at DESC LIMIT 30",
-                [security.UNKNOWN, config.UNKNOWN_MAX_TRIES, fresh_cut],
+                [security.HONEYPOT, config.UNKNOWN_MAX_TRIES, fresh_cut, young_cut],
             )
-            if unknowns:
-                log.info("%s yeni token yeniden deneniyor", len(unknowns))
-                await _rescan_rows(session, unknowns)
+            if fresh:
+                log.info("%s taze token yeniden taranıyor", len(fresh))
+                await _rescan_rows(session, fresh)
 
             old_cut = _now() - timedelta(hours=config.RESCAN_AFTER_HOURS)
             stale = await db.rows(

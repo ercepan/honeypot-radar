@@ -78,10 +78,12 @@ SCAN_CONCURRENCY = 3
 # Token'ları periyodik yeniden tara: "bugün temiz" yarın honeypot olabilir
 RESCAN_AFTER_HOURS = 12
 
-# Yeni açılan token'lar API'lerde henüz indekslenmemiş olur ("bilinmiyor" çıkar).
-# Onları saatlerce bekletmeyip kısa aralıkla yeniden deniyoruz.
+# Yeni açılan token'lar API'lerde henüz indekslenmemiş olur; ilk taramada
+# güvenlik verisi eksik gelir. Bu yüzden taze token'lar kısa aralıklarla
+# birkaç kez yeniden taranır — geç gelen honeypot bayrağını kaçırmamak için.
 UNKNOWN_RETRY_MINUTES = 8
 UNKNOWN_MAX_TRIES = 6
+YOUNG_WATCH_HOURS = 3   # bu yaştan taze token'lar tekrar tekrar kontrol edilir
 
 # Web arayüzünde ana sayfada kaç kayıt gösterilsin
 FEED_LIMIT = 100
