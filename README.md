@@ -6,6 +6,7 @@ geçirir. Tuzak çıkanlar ana sayfada canlı bir listeye düşer — sen hiçbi
 - **Canlı akış** — yeni token'lar saniyeler içinde taranır, honeypot'lar işaretlenir
 - **Token sayfası** — güvenlik kartı + "kim ne almış" (son işlemler, alıcı cüzdanlar)
 - **Dolandırıcı profili** — aynı cüzdanın açtığı tüm token'lar; 41. tuzağını kurduğunda tanırsın
+- **Telegram uyarısı** — honeypot yakalandığı anda telefonuna mesaj (kontrat adresi kopyalanabilir)
 
 ## Nasıl çalışıyor?
 
@@ -53,8 +54,22 @@ Tarayıcıda: http://127.0.0.1:8000
 ```
 DATABASE_URL=            # boşsa yerel SQLite. Üretimde Supabase Postgres URL'i
 BSCSCAN_API_KEY=         # isteğe bağlı: fon kaynağı kümelemesi için
+TELEGRAM_BOT_TOKEN=      # isteğe bağlı: honeypot uyarıları
+TELEGRAM_CHAT_ID=        # uyarıların gideceği sohbet
 PORT=8000
 ```
+
+### Telegram uyarıları
+
+Honeypot yakalandığı anda mesaj gelir; her token için **yalnızca bir kez**
+(veritabanındaki `alerted` sütunu tekrarı engeller). Kurulum:
+
+1. [@BotFather](https://t.me/BotFather) → `/newbot` → token'ı al
+2. Yeni bota `/start` yaz (bot ancak başlattığın kişiye mesaj gönderebilir)
+3. `api.telegram.org/bot<TOKEN>/getUpdates` adresinden `chat.id` değerini oku
+4. İkisini ortam değişkeni olarak tanımla
+
+Değişkenler boşsa uyarı sistemi sessizce devre dışı kalır, uygulama normal çalışır.
 
 ## Yayına alma (Render ücretsiz)
 

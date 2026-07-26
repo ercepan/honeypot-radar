@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 import aiohttp
 
-from . import chain, config, db, security
+from . import chain, config, db, notify, security
 
 log = logging.getLogger("radar.scanner")
 
@@ -63,8 +63,16 @@ async def save(pair: chain.NewPair, rep: security.TokenReport) -> None:
             ],
         )
 
+    crew_count = 0
     if rep.creator:
         await touch_deployer(rep.creator, rep.verdict == security.HONEYPOT)
+        crew = await db.row(
+            "SELECT honeypot_count FROM deployers WHERE address = ?", [rep.creator]
+        )
+        crew_count = int((crew or {}).get("honeypot_count") or 0)
+
+    if rep.verdict == security.HONEYPOT:
+        await notify.honeypot_found(rep, crew_count)
 
 
 async def touch_deployer(address: str, is_honeypot: bool) -> None:
@@ -233,6 +241,9 @@ async def run() -> None:
         asyncio.create_task(gap_filler(queue, session)),
         asyncio.create_task(rescanner(session)),
     ]
+    sender = notify.start()
+    if sender:
+        tasks.append(sender)
     for i in range(config.SCAN_CONCURRENCY):
         tasks.append(asyncio.create_task(worker(f"w{i}", queue, session)))
     log.info("Tarayıcı çalışıyor (%s işçi)", config.SCAN_CONCURRENCY)

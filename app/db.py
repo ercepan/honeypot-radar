@@ -43,7 +43,8 @@ SCHEMA = [
         holder_count   INTEGER,
         lp_locked_pct  DOUBLE PRECISION,
         scanned_at     TIMESTAMP,
-        scan_count     INTEGER DEFAULT 0
+        scan_count     INTEGER DEFAULT 0,
+        alerted        INTEGER DEFAULT 0
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_tokens_found ON tokens(found_at DESC)",
@@ -118,13 +119,25 @@ def _numbered(query: str) -> str:
 
 # ------------------------------------------------------------ genel API
 
+# Şema sonradan büyüdüğünde eski veritabanlarını da güncel tutar.
+# (Hata verirse sütun zaten vardır — yok sayılır.)
+MIGRATIONS = [
+    "ALTER TABLE tokens ADD COLUMN alerted INTEGER DEFAULT 0",
+]
+
+
 async def init() -> None:
-    """Tabloları oluşturur (varsa dokunmaz)."""
+    """Tabloları oluşturur (varsa dokunmaz) ve eksik sütunları ekler."""
     if is_postgres():
         pool = await _pool()
         async with pool.acquire() as c:
             for q in SCHEMA:
                 await c.execute(q)
+            for q in MIGRATIONS:
+                try:
+                    await c.execute(q)
+                except Exception:  # noqa: BLE001 — sütun zaten var
+                    pass
     else:
         def _create():
             with _sqlite() as c:
@@ -133,6 +146,11 @@ async def init() -> None:
                     c.execute(
                         q.replace("DOUBLE PRECISION", "REAL").replace("BIGINT", "INTEGER")
                     )
+                for q in MIGRATIONS:
+                    try:
+                        c.execute(q)
+                    except sqlite3.OperationalError:
+                        pass  # sütun zaten var
 
         await asyncio.to_thread(_create)
 
