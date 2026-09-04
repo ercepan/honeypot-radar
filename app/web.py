@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -37,6 +38,15 @@ async def lifespan(app: FastAPI):
     _tasks.append(asyncio.create_task(scanner.run()))
     if config.SELF_URL:
         _tasks.append(asyncio.create_task(_self_ping()))
+
+    # Kanal temizlik botu aynı süreçte çalışır (BOT_TOKEN tanımlıysa).
+    # Neden birlikte: iki ayrı servis ücretsiz barındırma kotasını ikiye
+    # katlıyor (ayda 1460 saat); tek süreçte 730 saate düşüp kotaya sığıyor.
+    if os.getenv("BOT_TOKEN", "").strip():
+        from . import temizlik
+
+        _tasks.append(asyncio.create_task(_supervised(temizlik.run_polling, "temizlik-botu")))
+
     log.info("Radar açıldı")
     try:
         yield
@@ -45,6 +55,25 @@ async def lifespan(app: FastAPI):
             t.cancel()
         if _session:
             await _session.close()
+
+
+async def _supervised(coro_fn, isim: str) -> None:
+    """Bir görev çökerse tüm süreci düşürmesin — bekleyip yeniden başlatır.
+
+    İki servis tek süreçte yaşadığı için bu şart: temizlik botundaki bir hata
+    radarı da öldürmemeli (ve tersi).
+    """
+    bekleme = 5
+    while True:
+        try:
+            await coro_fn()
+            log.warning("%s beklenmedik şekilde bitti, yeniden başlatılıyor", isim)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            log.exception("%s çöktü, %s sn sonra yeniden denenecek", isim, bekleme)
+        await asyncio.sleep(bekleme)
+        bekleme = min(bekleme * 2, 300)
 
 
 async def _self_ping() -> None:

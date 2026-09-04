@@ -80,18 +80,21 @@ async def _sender() -> None:
         while True:
             text = await _queue.get()
             try:
-                for attempt in range(3):
-                    async with session.post(
-                        url,
-                        json={
-                            "chat_id": CHAT_ID,
-                            "text": text,
-                            "parse_mode": "HTML",
-                            "disable_web_page_preview": True,
-                        },
-                        timeout=aiohttp.ClientTimeout(total=25),
-                    ) as r:
-                        data = await r.json(content_type=None)
+                # Her deneme AYRI korunuyor: geçici bir ağ hatası (connection
+                # reset / timeout) tüm denemeleri iptal edip uyarıyı kaybetmesin.
+                for attempt in range(4):
+                    try:
+                        async with session.post(
+                            url,
+                            json={
+                                "chat_id": CHAT_ID,
+                                "text": text,
+                                "parse_mode": "HTML",
+                                "disable_web_page_preview": True,
+                            },
+                            timeout=aiohttp.ClientTimeout(total=25),
+                        ) as r:
+                            data = await r.json(content_type=None)
                         if data.get("ok"):
                             break
                         wait = (data.get("parameters") or {}).get("retry_after")
@@ -100,6 +103,12 @@ async def _sender() -> None:
                             continue
                         log.warning("Telegram reddetti: %s", data.get("description"))
                         break
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:  # ağ hatası — bekleyip yeniden dene
+                        if attempt == 3:
+                            raise
+                        await asyncio.sleep(2 * (attempt + 1))
             except asyncio.CancelledError:
                 raise
             except Exception:  # noqa: BLE001 — bildirim hatası tarayıcıyı durdurmaz
