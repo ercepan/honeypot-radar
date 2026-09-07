@@ -53,6 +53,22 @@ YETKI_YERLESME = 3.0
 _DAVET_RE = re.compile(r"(?:t\.me/(?:joinchat/|\+))([A-Za-z0-9_-]+)")
 
 
+async def sohbet_tipi(bot: Bot, chat_id: int) -> Optional[str]:
+    """'channel' (yayın kanalı) | 'supergroup' | 'group'. Erişilemezse None.
+
+    Bu ayrım SESSİZLİK için kritik:
+      • Yayın kanalında üye katılması/ayrılması sohbette GÖRÜNMEZ.
+      • Süper grup/grupta "X gruba katıldı" ve "X gruptan ayrıldı" servis
+        mesajları sohbete DÜŞER — ve bunlar bizim silemediğimiz mesajlar.
+    Bu yüzden otomatik katıl/çık dansı yalnızca yayın kanallarında yapılır.
+    """
+    try:
+        sohbet = await bot.get_chat(chat_id)
+        return sohbet.type
+    except (TelegramBadRequest, TelegramForbiddenError):
+        return None
+
+
 async def bot_yetkileri(bot: Bot, chat_id: int) -> Optional[dict]:
     """Botun bu kanaldaki hakları. Kanalda değilse/erişemiyorsa None."""
     try:
@@ -145,6 +161,18 @@ async def yetki_ver(bot: Bot, client, chat_id: int, hesap_id: int) -> tuple[bool
         icerde = False
 
     if not icerde:
+        # SESSİZLİK KORUMASI: süper grup/grupta kanala girmek "X gruba katıldı"
+        # servis mesajı bastırır. Bu mesajı biz silemeyiz (bize ait değil, üstelik
+        # ana mesajın altında kalır). O yüzden orada otomatik katılma YAPMIYORUZ.
+        tip = await sohbet_tipi(bot, chat_id)
+        if tip != "channel":
+            return False, (
+                "🔇 Burası bir <b>grup</b> (yayın kanalı değil). Gruba katılmam "
+                '"gruba katıldı" yazısı bastırır ve o yazıyı silemem.\n\n'
+                "Sessiz kalması için hesabı gruba <b>bir kez elle</b> ekleyin; "
+                "sonraki temizliklerde yetkiyi otomatik alıp bırakırım, "
+                "hiçbir iz kalmaz."
+            )
         link = await _davet_linki(bot, chat_id)
         if link is None:
             return False, "❌ Davet linki üretemedim (botun davet yetkisi yok olabilir)."
@@ -180,9 +208,11 @@ async def yetki_ver(bot: Bot, client, chat_id: int, hesap_id: int) -> tuple[bool
         log.warning("Yükseltme başarısız (chat=%s): %s", chat_id, e)
         return False, _hata_turkce(str(e))
 
-    log.info("Hesaba silme yetkisi verildi: chat=%s", chat_id)
+    log.info("Hesaba silme yetkisi verildi: chat=%s (katıldık=%s)", chat_id, not icerde)
     await asyncio.sleep(YETKI_YERLESME)  # yetki MTProto tarafında görünsün
-    return True, ""
+    # Dönüş metni "KATILDIK" ise iş bitince kanaldan çıkılır; zaten üyeysek
+    # çıkmayız (çıkış da grupta iz bırakabilir, üstelik üyeliği bozmaya gerek yok).
+    return True, ("KATILDIK" if not icerde else "")
 
 
 async def yetki_al(bot: Bot, chat_id: int, hesap_id: int) -> bool:
@@ -211,7 +241,11 @@ async def yetki_al(bot: Bot, chat_id: int, hesap_id: int) -> bool:
 
 
 async def kanaldan_cik(client, chat_id: int) -> bool:
-    """Hesap kanaldan ayrılır — kalıcı üyelik bırakmıyoruz."""
+    """Hesap kanaldan ayrılır — kalıcı üyelik bırakmıyoruz.
+
+    YALNIZCA yayın kanallarında ve yalnızca bu iş için katıldıysak çağrılır
+    (bkz. yetki_ver'in "KATILDIK" dönüşü); grupta ayrılmak iz bırakır.
+    """
     try:
         from telethon.tl.functions.channels import LeaveChannelRequest
         from telethon.tl.types import PeerChannel
