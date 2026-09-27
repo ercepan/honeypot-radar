@@ -7,3 +7,6 @@ honeypot_radar.db
 
 # Otomatik moda izinli kisi numaralari (kisisel veri)
 app/izinliler.json
+
+# Render'a yapistirilacak kopya (gizli)
+.env.render
