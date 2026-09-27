@@ -1,0 +1,41 @@
+[Unit]
+Description=Honeypot Radar + Kanal Temizlik Botu
+Documentation=https://github.com/ercepan/honeypot-radar
+# Ağ gerçekten hazır olmadan başlamasın: Telethon/WebSocket açılışta ağ ister.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=radar
+Group=radar
+WorkingDirectory=/opt/honeypot-radar
+EnvironmentFile=/opt/honeypot-radar/.env
+ExecStart=/opt/honeypot-radar/.venv/bin/python run.py
+
+# Çökerse her zaman geri gelsin. ThrottleInterval yerine RestartSec:
+# 10 saniye bekleyip yeniden dener, sonsuz hızlı döngüye girmez.
+Restart=always
+RestartSec=10
+# Sürekli çöküyorsa systemd vazgeçmesin (bot 7/24 kalmalı)
+StartLimitIntervalSec=0
+
+# Kayıtlar journald'a düşer: journalctl -u honeypotradar -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=honeypotradar
+
+# --- Güvenlik sıkılaştırması ---
+# Sunucuda oturum anahtarı (USER_SESSION) duruyor; süreç kendi dizini dışına
+# yazamasın, yeni yetki kazanamasın.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/honeypot-radar
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
