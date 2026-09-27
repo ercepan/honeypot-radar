@@ -1,0 +1,50 @@
+# Render Blueprint — tek ücretsiz web servisi
+#
+# NEDEN TEK SERVİS: Render ücretsiz katman 750 örnek-saat/ay verir (çalışma
+# alanı başına). Tek servis 7/24 çalışırsa ~744 saat eder ve sığar. İki servis
+# ~1460 saat eder ve ayın ortasında ikisi de askıya alınır — daha önce başımıza
+# geldi. Bu yüzden radar ve temizlik botu AYNI süreçte çalışıyor.
+#
+# NEDEN BLUEPRINT: Depoyu "Public Git Repository" URL'iyle bağlarsan Render
+# otomatik dağıtım YAPMAZ; her değişiklikte elle "Manual Deploy" gerekir.
+# Blueprint + GitHub bağlantısı ile git push kendiliğinden dağıtılır.
+
+services:
+  - type: web
+    name: honeypot-radar
+    runtime: python
+    plan: free
+    region: frankfurt          # Türkiye'ye en yakın bölge
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    # Sağlık yoklaması: Render buraya istek atar, bu da servisi uyanık tutar.
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.4"
+
+      # --- Gizli değerler: panelden girilir, depoya YAZILMAZ ---
+      # sync: false = "bu değeri blueprint'ten almayacağım, panelde soracağım"
+      - key: BOT_TOKEN          # @kanal_supurgesi_bot token'ı
+        sync: false
+      - key: API_ID             # my.telegram.org
+        sync: false
+      - key: API_HASH
+        sync: false
+      - key: USER_SESSION       # hesap oturum anahtarı — 48 saat sınırını kaldırır
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN # radar uyarıları
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+
+      # --- Kalıcı depolama (isteğe bağlı ama ÖNEMLİ) ---
+      # Render ücretsiz katmanda dosya sistemi kalıcı DEĞİL: her yeniden
+      # başlatmada SQLite veritabanı silinir, radar geçmişi sıfırlanır.
+      # Render'ın kendi ücretsiz Postgres'i 30 günde sona eriyor, o yüzden
+      # çözüm değil. Supabase'in ücretsiz Postgres'i süresiz — bağlantı
+      # adresini buraya gir, db.py kendiliğinden Postgres'e geçer.
+      - key: DATABASE_URL
+        sync: false
