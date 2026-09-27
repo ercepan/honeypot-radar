@@ -22,7 +22,14 @@ log = logging.getLogger("radar.notify")
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
-SITE_URL = os.getenv("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
+# Uyarılardaki "Detay →" linkinin adresi.
+# SITE_URL kendi başına durur: Render'da RENDER_EXTERNAL_URL kendiliğinden gelir,
+# VDS'te ise SITE_URL verilir. İkisi ayrı, çünkü RENDER_EXTERNAL_URL aynı zamanda
+# uyku önleyici self-ping'i açıyor — VDS'te ona gerek yok.
+SITE_URL = (
+    os.getenv("SITE_URL", "").strip()
+    or os.getenv("RENDER_EXTERNAL_URL", "").strip()
+).rstrip("/")
 
 # Telegram sohbet başına ~1 mesaj/sn kabul eder; kuyrukla sıraya sokuyoruz.
 SEND_GAP = 1.2

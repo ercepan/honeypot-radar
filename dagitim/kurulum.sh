@@ -55,6 +55,8 @@ USER_SESSION=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 PORT=8000
+# Uyarı mesajlarındaki "Detay" linki için (isteğe bağlı):
+# SITE_URL=http://SUNUCU_IP:8000
 SABLON
     echo "     Şablon oluşturuldu — DOLDURMAN GEREKİYOR:"
     echo "       nano $DIZIN/.env"
