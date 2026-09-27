@@ -25,6 +25,12 @@ services:
       - key: PYTHON_VERSION
         value: "3.13.4"
 
+      # Radar tarayıcısı KAPALI. Ücretsiz katman 0.1 CPU / 512 MB veriyor ve
+      # kritik olan temizlik botu. Tarayıcı sürekli zincir + API trafiği
+      # ürettiği için kaynağı ona bırakmıyoruz. Radar istenirse: RADAR=1
+      - key: RADAR
+        value: "0"
+
       # --- Gizli değerler: panelden girilir, depoya YAZILMAZ ---
       # sync: false = "bu değeri blueprint'ten almayacağım, panelde soracağım"
       - key: BOT_TOKEN          # @kanal_supurgesi_bot token'ı

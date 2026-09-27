@@ -35,7 +35,14 @@ async def lifespan(app: FastAPI):
     global _session
     await db.init()
     _session = aiohttp.ClientSession()
-    _tasks.append(asyncio.create_task(scanner.run()))
+    # Radar tarayıcısı isteğe bağlı: RADAR=0 ile kapatılır.
+    # Ücretsiz barındırmada kaynak dar (0.1 CPU / 512 MB) ve kritik olan
+    # temizlik botu. Tarayıcı sürekli zincir + API trafiği ürettiği için,
+    # gerekmediğinde kapatmak botu korur.
+    if os.getenv("RADAR", "1").strip().lower() not in ("0", "false", "hayir", "kapali"):
+        _tasks.append(asyncio.create_task(scanner.run()))
+    else:
+        log.info("RADAR=0 — tarayıcı kapalı, yalnızca temizlik botu çalışıyor")
     if config.SELF_URL:
         _tasks.append(asyncio.create_task(_self_ping()))
 
